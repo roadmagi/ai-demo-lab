@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { splitByCitations, type Span } from "@/lib/highlight";
 import type { VerifiedField } from "@/lib/verify";
 
@@ -39,6 +39,15 @@ export function InvoicePane({
     }));
     return splitByCitations(text, spans);
   }, [located, text]);
+
+  // Long documents push most highlights out of view, so hovering a field
+  // brings its quote to the reader rather than asking them to hunt for it.
+  useEffect(() => {
+    if (activeMarker < 0) return;
+    scrollRef.current
+      ?.querySelector(`[data-marker="${activeMarker}"]`)
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [activeMarker]);
 
   return (
     <aside className="flex min-h-0 flex-col rounded-xl border border-line bg-card">

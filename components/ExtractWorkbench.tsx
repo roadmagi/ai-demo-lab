@@ -43,6 +43,7 @@ export function ExtractWorkbench({ samples }: { samples: Sample[] }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [activePath, setActivePath] = useState<string | null>(null);
   const [cached, setCached] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
 
   const issues = useMemo(
@@ -62,6 +63,9 @@ export function ExtractWorkbench({ samples }: { samples: Sample[] }) {
     setNotice(null);
     setFields(null);
     setActivePath(null);
+    // Drafts belong to the previous document; carrying them over would show
+    // one invoice's corrections on another's fields.
+    setDrafts({});
     setStage("reading");
 
     let response: Response;
@@ -119,21 +123,30 @@ export function ExtractWorkbench({ samples }: { samples: Sample[] }) {
     [run],
   );
 
-  const edit = (path: string, raw: string) =>
+  /**
+   * What the reviewer has typed, kept as raw text per field.
+   *
+   * The parsed number can't drive the input on its own: clearing the box to
+   * retype would parse to 0, render "0", and make the field impossible to
+   * empty. So the draft is what's displayed, and the parsed value is what
+   * reconciliation sees.
+   */
+  const edit = (path: string, raw: string) => {
+    setDrafts((current) => ({ ...current, [path]: raw }));
     setFields(
       (current) =>
-        current?.map((field) =>
-          field.path === path
-            ? {
-                ...field,
-                value:
-                  typeof field.value === "number"
-                    ? (Number(raw.replace(/,/g, "")) || 0)
-                    : raw,
-              }
-            : field,
-        ) ?? null,
+        current?.map((field) => {
+          if (field.path !== path) return field;
+          if (typeof field.value !== "number") return { ...field, value: raw };
+          const parsed = Number(raw.replace(/,/g, "").trim());
+          // Mid-edit garbage ("", "-", "1.") leaves the last good number in
+          // place rather than forcing a 0 the reviewer never typed.
+          return Number.isFinite(parsed) && raw.trim() !== ""
+            ? { ...field, value: parsed }
+            : field;
+        }) ?? null,
     );
+  };
 
   const busy = stage !== null;
 
@@ -221,7 +234,7 @@ export function ExtractWorkbench({ samples }: { samples: Sample[] }) {
                       <td className="py-2 align-top">
                         {needsReview ? (
                           <input
-                            value={String(field.value)}
+                            value={drafts[field.path] ?? String(field.value)}
                             onChange={(event) =>
                               edit(field.path, event.target.value)
                             }
