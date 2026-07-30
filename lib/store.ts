@@ -126,6 +126,79 @@ export class MemoryStore implements Store {
 }
 
 /**
+ * Runs against Redis until Redis fails, then against process memory.
+ *
+ * Missing credentials already degrade to `MemoryStore`, but credentials that
+ * are present and *broken* used to throw straight out of the route handler —
+ * one unreachable Upstash turned every guarded page into a 500. A demo about
+ * guardrails should lose the guardrails' precision, not the whole site, so a
+ * failed call trips this over to memory and the request continues.
+ *
+ * The trip is one-way for the life of the instance. Retrying a dead host costs
+ * a DNS timeout on every subsequent request, and serverless instances are
+ * short-lived enough that the next cold start re-tests Redis anyway.
+ */
+export class ResilientStore implements Store {
+  private tripped = false;
+
+  constructor(
+    private readonly primary: Store,
+    private readonly fallback: Store = new MemoryStore(),
+    private readonly onError: (error: unknown) => void = reportStoreFailure,
+  ) {}
+
+  /** True once the primary has failed and memory has taken over. */
+  get degraded(): boolean {
+    return this.tripped;
+  }
+
+  private async run<T>(op: (store: Store) => Promise<T>): Promise<T> {
+    if (!this.tripped) {
+      try {
+        return await op(this.primary);
+      } catch (error) {
+        this.tripped = true;
+        this.onError(error);
+      }
+    }
+    return op(this.fallback);
+  }
+
+  getJSON<T>(key: string) {
+    return this.run((store) => store.getJSON<T>(key));
+  }
+
+  setJSON(key: string, value: unknown, ttlSeconds?: number) {
+    return this.run((store) => store.setJSON(key, value, ttlSeconds));
+  }
+
+  incrBy(key: string, amount: number, ttlSeconds?: number) {
+    return this.run((store) => store.incrBy(key, amount, ttlSeconds));
+  }
+
+  hIncrBy(key: string, field: string, amount: number) {
+    return this.run((store) => store.hIncrBy(key, field, amount));
+  }
+
+  hSetJSON(key: string, field: string, value: unknown) {
+    return this.run((store) => store.hSetJSON(key, field, value));
+  }
+
+  hGetAllJSON<T>(key: string) {
+    return this.run((store) => store.hGetAllJSON<T>(key));
+  }
+}
+
+function reportStoreFailure(error: unknown) {
+  console.error(
+    "[store] Redis is unreachable — falling back to process memory. " +
+      "Rate limits, response cache, and the token budget are now per-instance " +
+      "and no longer shared across serverless invocations.",
+    error,
+  );
+}
+
+/**
  * Held on `globalThis` rather than in a module variable.
  *
  * Next.js bundles route handlers and pages into separate module graphs, so a
@@ -148,7 +221,7 @@ export function getStore(): Store {
 
   container[STORE_KEY] =
     url && token
-      ? new RedisStore(new Redis({ url, token }))
+      ? new ResilientStore(new RedisStore(new Redis({ url, token })))
       : new MemoryStore();
 
   return container[STORE_KEY];
