@@ -9,9 +9,13 @@ import {
   normalizeQuestion,
   readBudget,
   recordSpend,
+  recordTurn,
   visitorId,
 } from "@/lib/guard";
-import { MemoryStore } from "@/lib/store";
+import type { Answer } from "@/lib/citations";
+import { listGaps } from "@/lib/gaps";
+import type { CachedAnswer } from "@/lib/protocol";
+import { MemoryStore, type Store } from "@/lib/store";
 
 const CONFIG = {
   rateLimit: 3,
@@ -236,5 +240,73 @@ describe("visitorId", () => {
 
   it("falls back to a shared bucket when no IP header is present", () => {
     expect(visitorId(new Headers())).toBe(visitorId(new Headers()));
+  });
+});
+
+describe("recordTurn", () => {
+  const ANSWER: Answer = {
+    segments: [{ text: "Exports run nightly.", markers: [0] }],
+    citations: [],
+  };
+  const EMPTY: Answer = { segments: [], citations: [] };
+  const BASE = {
+    key: "answer:abc",
+    question: "how do I export",
+    sources: [],
+    spend: 1_200,
+    cacheTtlSeconds: 600,
+  };
+
+  it("caches an answer that has content", async () => {
+    const store = new MemoryStore();
+
+    await recordTurn(store, { ...BASE, answer: ANSWER, noAnswer: false });
+
+    const cached = await store.getJSON<CachedAnswer>("answer:abc");
+    expect(cached?.answer.segments[0].text).toBe("Exports run nightly.");
+    expect(cached?.noAnswer).toBe(false);
+  });
+
+  it("does not cache an empty answer", async () => {
+    const store = new MemoryStore();
+
+    await recordTurn(store, { ...BASE, answer: EMPTY, noAnswer: false });
+
+    await expect(store.getJSON("answer:abc")).resolves.toBeNull();
+  });
+
+  it("records spend against the daily budget", async () => {
+    const store = new MemoryStore();
+
+    await recordTurn(store, { ...BASE, answer: ANSWER, noAnswer: false });
+
+    const budget = await readBudget(store, 10_000);
+    expect(budget.spent).toBe(1_200);
+  });
+
+  it("logs a gap only when the answer was a refusal", async () => {
+    const answered = new MemoryStore();
+    const refused = new MemoryStore();
+
+    await recordTurn(answered, { ...BASE, answer: ANSWER, noAnswer: false });
+    await recordTurn(refused, { ...BASE, answer: ANSWER, noAnswer: true });
+
+    expect(await listGaps(answered)).toHaveLength(0);
+    expect(await listGaps(refused)).toHaveLength(1);
+  });
+
+  it("never throws, so bookkeeping can't take down a served answer", async () => {
+    const broken: Store = {
+      getJSON: async () => { throw new Error("down"); },
+      setJSON: async () => { throw new Error("down"); },
+      incrBy: async () => { throw new Error("down"); },
+      hIncrBy: async () => { throw new Error("down"); },
+      hSetJSON: async () => { throw new Error("down"); },
+      hGetAllJSON: async () => { throw new Error("down"); },
+    };
+
+    await expect(
+      recordTurn(broken, { ...BASE, answer: ANSWER, noAnswer: true }),
+    ).resolves.toBeUndefined();
   });
 });

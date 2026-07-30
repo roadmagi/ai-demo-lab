@@ -1,4 +1,4 @@
-import type { NextRequest } from "next/server";
+import { after, type NextRequest } from "next/server";
 import {
   answerRequestOptions,
   chunksAsSources,
@@ -20,10 +20,9 @@ import {
   configFromEnv,
   fingerprint,
   guard,
-  recordSpend,
+  recordTurn,
   visitorId,
 } from "@/lib/guard";
-import { recordGap } from "@/lib/gaps";
 import { encodeEvent, type CachedAnswer, type ChatEvent, type SourceRef } from "@/lib/protocol";
 import { getStore } from "@/lib/store";
 
@@ -263,28 +262,32 @@ function streamLiveAnswer({
             cacheReadTokens: final.usage.cache_read_input_tokens ?? 0,
           },
         });
-        controller.close();
-
-        // Bookkeeping runs after the response is closed so it never delays
-        // the visitor. Spend is taken from the API's own usage numbers rather
-        // than an estimate.
+        // Bookkeeping must not delay the visitor, but it can't simply run
+        // after `controller.close()` either: this is a serverless function,
+        // and once the response is closed the instance can be frozen before a
+        // write to Redis ever lands. `after` is the one way to have both — the
+        // response finishes first, and the platform keeps us alive to finish.
+        //
+        // Spend comes from the API's own usage numbers rather than an estimate.
         const spend =
           final.usage.input_tokens +
           final.usage.output_tokens +
           (final.usage.cache_creation_input_tokens ?? 0) +
           (final.usage.cache_read_input_tokens ?? 0);
 
-        await Promise.allSettled([
-          recordSpend(store, spend),
-          answer.segments.length > 0
-            ? store.setJSON(
-                key,
-                { answer, sources, noAnswer } satisfies CachedAnswer,
-                config.cacheTtlSeconds,
-              )
-            : Promise.resolve(),
-          noAnswer ? recordGap(store, question) : Promise.resolve(),
-        ]);
+        after(() =>
+          recordTurn(store, {
+            key,
+            question,
+            answer,
+            sources,
+            noAnswer,
+            spend,
+            cacheTtlSeconds: config.cacheTtlSeconds,
+          }),
+        );
+
+        controller.close();
       } catch (error) {
         console.error("[chat] answering failed", error);
         send({
