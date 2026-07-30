@@ -172,7 +172,9 @@ export const INVOICE_TOOL = {
     ],
     additionalProperties: false,
   },
-} as const;
+  // Deliberately not `as const`: that would make `required` a readonly tuple,
+  // which the SDK's `Tool` type rejects in favour of a mutable string[].
+};
 
 /**
  * The "do not correct the arithmetic" instruction is load-bearing, not
@@ -186,6 +188,11 @@ anything — if the document's own arithmetic is wrong, record what it says. A
 separate check catches those errors, and silently fixing them hides the problem
 the reader needs to see.
 
-Every quote must be copied verbatim from the document. If a value is not
-printed and you had to infer it, quote the closest supporting text rather than
-inventing one.`;
+Every quote must be copied verbatim from the document and must contain the
+value itself.
+
+If a value is not printed anywhere — because you inferred, computed, or derived
+it — return an empty string for that quote. An empty quote marks the field for
+human review, which is the correct outcome. Do not quote text that merely
+supports or implies the value: a due date computed from "Net 30" is not printed,
+so its quote is empty, not "Net 30".`;

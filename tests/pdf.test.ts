@@ -35,6 +35,19 @@ describe("extractPdf", () => {
       code: "corrupt",
     });
   });
+
+  it("leaves the caller's bytes intact", async () => {
+    // pdf.js transfers the buffer to its worker, which detaches it. Without a
+    // defensive copy the caller is left holding a zero-length array — and the
+    // route needs these same bytes afterwards to send the PDF to the model.
+    // The symptom is a 400 "PDF cannot be empty" nowhere near the cause.
+    const bytes = new Uint8Array(readFileSync("content/invoices/clean.pdf"));
+    const before = bytes.length;
+
+    await extractPdf(bytes);
+
+    expect(bytes.length).toBe(before);
+  });
 });
 
 describe("bundled samples", () => {

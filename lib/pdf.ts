@@ -40,7 +40,11 @@ export async function extractPdf(
   let pages: number;
 
   try {
-    const doc = await getDocumentProxy(bytes);
+    // pdf.js transfers the buffer to its worker, which detaches it and leaves
+    // the caller holding a zero-length array. The route needs these same bytes
+    // afterwards to send the PDF to the model, and the resulting failure — a
+    // 400 "PDF cannot be empty" — points nowhere near this line. Copy first.
+    const doc = await getDocumentProxy(bytes.slice());
     const result = await extractText(doc, { mergePages: true });
     raw = result.text;
     pages = result.totalPages;
