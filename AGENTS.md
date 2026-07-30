@@ -98,6 +98,12 @@ produce no text blocks for citations to attach to — legal and silently useless
 PDF citations are page-level regardless, so they'd be worthless on a one-page
 invoice. Grounding comes from quote verification in `lib/verify.ts` instead.
 
+**Node 22 is a hard floor, set by `unpdf`, not by Next.** Next itself only wants
+`>=20.9.0`, so the `engines` field in `package.json` looks over-strict until you
+check `unpdf`'s own `engines: {"node": ">=22"}`. Vercel reads that field to pick
+its runtime; relaxing it would break PDF extraction in production with nothing
+in the repo explaining why.
+
 **`extractPdf` copies its input, and must keep doing so.** pdf.js transfers the
 buffer to its worker and detaches it, leaving the caller with a zero-length
 array. `/api/extract` needs those same bytes afterwards to send the PDF to the
