@@ -23,15 +23,15 @@ const DEMOS: Demo[] = [
   },
   {
     href: "/extract",
-    title: "Invoice & document extraction",
+    title: "Invoice extraction you can audit",
     blurb:
-      "Drop in a PDF invoice, get structured rows out — with validation rules and a review queue for anything the model wasn't confident about.",
+      "Drop in a PDF invoice, get structured rows out — where every field carries the text it was read from, and the arithmetic is checked independently of the model.",
     points: [
-      "Schema-enforced extraction, not prose parsing",
-      "Confidence thresholds route to human review",
-      "Exports clean rows for the finance system",
+      "Every field carries the quote it came from, checked against the document",
+      "Arithmetic is reconciled separately — a plausible wrong total gets caught",
+      "Flagged fields are correctable inline, then exported as CSV",
     ],
-    status: "building",
+    status: "live",
   },
   {
     href: "/repurpose",

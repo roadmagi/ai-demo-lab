@@ -91,6 +91,30 @@ whatever was pasted into them and `"https://…"` is not a URL.
 `readdir`, so `next.config.ts` lists `content/**/*` in `outputFileTracingIncludes`.
 Move or rename `content/` and the deployed bundle loses the markdown.
 
+**Citations must stay off on the extract path.** Enabling citations alongside
+`output_config.format` is a hard 400 (`"Citations cannot be enabled when output
+format is set"`), and citations alongside a *forced* strict tool are accepted but
+produce no text blocks for citations to attach to — legal and silently useless.
+PDF citations are page-level regardless, so they'd be worthless on a one-page
+invoice. Grounding comes from quote verification in `lib/verify.ts` instead.
+
+**`extractPdf` copies its input, and must keep doing so.** pdf.js transfers the
+buffer to its worker and detaches it, leaving the caller with a zero-length
+array. `/api/extract` needs those same bytes afterwards to send the PDF to the
+model; without the copy the API returns `400 "PDF cannot be empty"` from a line
+nowhere near the cause.
+
+**`lib/invoice.ts` must stay free of server-only imports.** `ExtractWorkbench`
+imports `reconcile` from it so the client and server share one implementation of
+the arithmetic. Adding a `node:` import, a store call, or anything Anthropic to
+that module breaks the client bundle and forces the logic to be duplicated.
+
+**Never tell the model to quote "supporting text".** The extraction prompt
+requires the quote to contain the value, and an empty quote when the value isn't
+printed. An earlier version asked for the closest supporting text, and a due date
+computed from "Net 30" was quoted as "Net 30" — which verifies, while the value
+itself is ungrounded. That instruction defeats the entire check.
+
 ## How the chat demo works
 
 Two context strategies, picked by corpus size:

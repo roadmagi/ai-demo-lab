@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
   if (!filename || !isAcceptedFilename(filename)) {
     return Response.json(
-      { error: "Upload a .md or .txt file. PDFs aren't supported here — see the README for why." },
+      { error: "Upload a .md or .txt file here. For PDF invoices, try the extraction demo at /extract." },
       { status: 400 },
     );
   }

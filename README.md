@@ -115,6 +115,65 @@ that doesn't:
 
 ---
 
+## Demo 2 — Invoice extraction you can audit
+
+`/extract` — upload a PDF invoice, get structured rows out. Demo 1 argues an
+answer is only as good as the source you can trace it to; demo 2 makes the same
+argument about extracted data: **a field is only as good as the text you can
+point at.**
+
+Two independent checks decide whether a field is trustworthy, and neither asks
+the model how confident it feels:
+
+1. **Quote verification.** The schema requires a verbatim quote beside every
+   value. The server confirms that quote appears in the PDF's extracted text and
+   computes the character span itself. A quote that isn't there is a hard
+   failure, not a low score.
+2. **Arithmetic reconciliation.** Line items must multiply out, sum to the
+   subtotal, and add with tax to the total — compared in integer minor units
+   with a one-unit tolerance for rounding. This runs entirely independently of
+   the model, so a confident, well-quoted, wrong total still gets caught.
+
+Anything failing either check becomes an editable field. Correcting it re-runs
+reconciliation instantly — the client imports the *same* `reconcile` the server
+used, so a cleared flag means it's genuinely clear.
+
+Three samples ship with the demo, so nobody has to upload a real invoice: one
+clean, one whose stated total is 1,428.00 when subtotal plus tax is 1,296.00,
+and one whose due date is never printed (terms say "Net 30") and therefore
+can't be grounded.
+
+### Why not the API's own citations?
+
+Demo 1 anchors claims with character-span citations from the API. That
+mechanism cannot be used here, which was verified against the live API rather
+than assumed:
+
+- Citations plus `output_config.format` returns **400** — *"Citations cannot be
+  enabled when output format is set."*
+- Citations plus a *forced* strict tool is accepted, but the response is a lone
+  `tool_use` block. Citations attach to text blocks, so there are none. Legal,
+  silent, and useless — a worse trap than the 400.
+- PDF citations are **page-level** anyway. On a one-page invoice every citation
+  would resolve to "page 1".
+
+Computing spans ourselves from verified quotes is both possible and stronger.
+
+### Known scope limits
+
+- **Text-based PDFs only.** Scans return a 422 that says so. Images inside PDFs
+  can't be read as text, and OCR is a different project.
+- **Short quotes match loosely.** Verification is a substring search, so a
+  one-character quote like `"2"` will find *something*. It holds up for the
+  fields that matter (names, dates, amounts) and is weakest exactly where the
+  stakes are lowest.
+- **Nothing is stored.** No PDF, no extracted text, no result beyond a response
+  cache keyed on the file's bytes. Invoice contents aren't anonymous the way the
+  gap report's questions are, so a processed-invoice log would leak one
+  visitor's vendors and amounts to the next.
+
+---
+
 ## The gap report
 
 `/chat/gaps` — every question the agent declined, ranked by how often it was
