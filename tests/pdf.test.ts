@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { extractPdf, normalizeWhitespace, PdfError } from "@/lib/pdf";
 
@@ -33,5 +34,38 @@ describe("extractPdf", () => {
     await expect(extractPdf(new Uint8Array([1, 2, 3]))).rejects.toMatchObject({
       code: "corrupt",
     });
+  });
+});
+
+describe("bundled samples", () => {
+  const read = (name: string) =>
+    new Uint8Array(readFileSync(`content/invoices/${name}.pdf`));
+
+  for (const name of ["clean", "bad-total", "inferred-field"]) {
+    it(`extracts text from ${name}.pdf`, async () => {
+      const { text, pages } = await extractPdf(read(name));
+
+      expect(pages).toBe(1);
+      expect(text.length).toBeGreaterThan(100);
+    });
+  }
+
+  it("keeps the deliberately wrong total in bad-total.pdf", async () => {
+    const { text } = await extractPdf(read("bad-total"));
+
+    // If this sample is ever "corrected", the demo's best moment dies
+    // silently — the arithmetic check would have nothing to catch.
+    expect(text).toContain("1,428.00");
+    expect(text).toContain("1,200.00");
+    expect(text).toContain("96.00");
+  });
+
+  it("prints no due date in inferred-field.pdf", async () => {
+    const { text } = await extractPdf(read("inferred-field"));
+
+    // The due date is inferable from "Net 30" but never printed, so any
+    // quote the model offers for it must fail verification.
+    expect(text).toContain("Net 30");
+    expect(text).not.toContain("Due 2026");
   });
 });

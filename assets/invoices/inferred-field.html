@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Invoice MS-0091 — Marrow &amp; Sons</title>
+    <!--
+      No due date is printed anywhere. The terms say "Net 30", so a due date is
+      inferable from the issue date but never stated, and any quote the model
+      offers for it should fail verification. That is the point of this sample:
+      a value the model had to reason its way to, caught because it cannot be
+      pointed at.
+    -->
+    <style>
+      @page { size: A4; margin: 18mm; }
+      * { box-sizing: border-box; }
+      body {
+        font: 11pt/1.5 "Helvetica Neue", Arial, sans-serif;
+        color: #16181d;
+        margin: 0;
+      }
+      header { display: flex; justify-content: space-between; align-items: flex-start; }
+      .vendor { font-size: 15pt; font-weight: 700; letter-spacing: -0.01em; }
+      .vendor-meta { margin-top: 4px; color: #5b6270; font-size: 9.5pt; }
+      .doc-title { font-size: 22pt; font-weight: 700; letter-spacing: -0.02em; }
+      .doc-meta { margin-top: 6px; text-align: right; font-size: 10pt; }
+      .doc-meta div { margin-top: 2px; }
+      .bill-to { margin-top: 34px; }
+      .label { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.08em; color: #5b6270; }
+      table { width: 100%; border-collapse: collapse; margin-top: 26px; }
+      th {
+        text-align: left; font-size: 8.5pt; text-transform: uppercase;
+        letter-spacing: 0.08em; color: #5b6270; font-weight: 600;
+        border-bottom: 1.5px solid #16181d; padding: 0 0 7px;
+      }
+      td { padding: 11px 0; border-bottom: 1px solid #e3e5ea; }
+      .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      th.num { text-align: right; }
+      tfoot td { border: none; padding: 5px 0; }
+      tfoot .total td { border-top: 1.5px solid #16181d; padding-top: 11px; font-weight: 700; font-size: 12pt; }
+      footer { margin-top: 40px; font-size: 9.5pt; color: #5b6270; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <div class="vendor">Marrow &amp; Sons</div>
+        <div class="vendor-meta">
+          The Old Bindery, Frome BA11 3DP<br />
+          VAT GB 209 5514 07
+        </div>
+      </div>
+      <div>
+        <div class="doc-title">INVOICE</div>
+        <div class="doc-meta">
+          <div><strong>MS-0091</strong></div>
+          <div>Issued 2026-07-09</div>
+          <div>Terms: Net 30</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="bill-to">
+      <div class="label">Bill to</div>
+      <div>Northwind Analytics Ltd<br />9 Lantern Street, Leeds LS2 7HQ</div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th class="num">Qty</th>
+          <th class="num">Unit price</th>
+          <th class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Archival binding, quarter leather</td>
+          <td class="num">3</td>
+          <td class="num">140.00</td>
+          <td class="num">420.00</td>
+        </tr>
+        <tr>
+          <td>Foil blocking, spine only</td>
+          <td class="num">3</td>
+          <td class="num">35.00</td>
+          <td class="num">105.00</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2"></td>
+          <td class="num">Subtotal</td>
+          <td class="num">525.00</td>
+        </tr>
+        <tr>
+          <td colspan="2"></td>
+          <td class="num">Tax (8%)</td>
+          <td class="num">42.00</td>
+        </tr>
+        <tr class="total">
+          <td colspan="2"></td>
+          <td class="num">Total USD</td>
+          <td class="num">567.00</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <footer>
+      Payment due 30 days from the issue date. Reference MS-0091 on all remittances.
+    </footer>
+  </body>
+</html>
