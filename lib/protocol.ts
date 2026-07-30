@@ -29,23 +29,27 @@ export type CachedAnswer = {
   noAnswer: boolean;
 };
 
-export function encodeEvent(event: ChatEvent): string {
+/**
+ * Generic over the event type so `/api/chat` and `/api/extract` share one wire
+ * format. Defaults to `ChatEvent`, so every existing call site is unchanged.
+ */
+export function encodeEvent<T = ChatEvent>(event: T): string {
   return `data: ${JSON.stringify(event)}\n\n`;
 }
 
 /** Parses an SSE body into events. Tolerates partial trailing frames. */
-export function createEventParser() {
+export function createEventParser<T = ChatEvent>() {
   let buffer = "";
-  return function push(chunk: string): ChatEvent[] {
+  return function push(chunk: string): T[] {
     buffer += chunk;
     const frames = buffer.split("\n\n");
     buffer = frames.pop() ?? "";
-    const events: ChatEvent[] = [];
+    const events: T[] = [];
     for (const frame of frames) {
       const line = frame.trim();
       if (!line.startsWith("data:")) continue;
       try {
-        events.push(JSON.parse(line.slice(5).trim()) as ChatEvent);
+        events.push(JSON.parse(line.slice(5).trim()) as T);
       } catch {
         // A frame that doesn't parse is dropped rather than killing the
         // stream — the next one is usually fine.

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Invoice HF-3318 — Halden Freight</title>
+    <!--
+      The demo's best moment lives in this file. Subtotal (1,200.00) plus tax
+      (96.00) is 1,296.00, but the stated total reads 1,428.00. The model will
+      extract it faithfully; arithmetic reconciliation is what catches it.
+      If anyone ever "fixes" this invoice, the demo loses its point.
+    -->
+    <style>
+      @page { size: A4; margin: 18mm; }
+      * { box-sizing: border-box; }
+      body {
+        font: 11pt/1.5 "Helvetica Neue", Arial, sans-serif;
+        color: #16181d;
+        margin: 0;
+      }
+      header { display: flex; justify-content: space-between; align-items: flex-start; }
+      .vendor { font-size: 15pt; font-weight: 700; letter-spacing: -0.01em; }
+      .vendor-meta { margin-top: 4px; color: #5b6270; font-size: 9.5pt; }
+      .doc-title { font-size: 22pt; font-weight: 700; letter-spacing: -0.02em; }
+      .doc-meta { margin-top: 6px; text-align: right; font-size: 10pt; }
+      .doc-meta div { margin-top: 2px; }
+      .bill-to { margin-top: 34px; }
+      .label { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.08em; color: #5b6270; }
+      table { width: 100%; border-collapse: collapse; margin-top: 26px; }
+      th {
+        text-align: left; font-size: 8.5pt; text-transform: uppercase;
+        letter-spacing: 0.08em; color: #5b6270; font-weight: 600;
+        border-bottom: 1.5px solid #16181d; padding: 0 0 7px;
+      }
+      td { padding: 11px 0; border-bottom: 1px solid #e3e5ea; }
+      .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      th.num { text-align: right; }
+      tfoot td { border: none; padding: 5px 0; }
+      tfoot .total td { border-top: 1.5px solid #16181d; padding-top: 11px; font-weight: 700; font-size: 12pt; }
+      footer { margin-top: 40px; font-size: 9.5pt; color: #5b6270; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <div class="vendor">Halden Freight</div>
+        <div class="vendor-meta">
+          Unit 12, Dockside Estate, Hull HU9 1PL<br />
+          VAT GB 771 4038 92
+        </div>
+      </div>
+      <div>
+        <div class="doc-title">INVOICE</div>
+        <div class="doc-meta">
+          <div><strong>HF-3318</strong></div>
+          <div>Issued 2026-07-14</div>
+          <div>Due 2026-08-13</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="bill-to">
+      <div class="label">Bill to</div>
+      <div>Northwind Analytics Ltd<br />9 Lantern Street, Leeds LS2 7HQ</div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th class="num">Qty</th>
+          <th class="num">Unit price</th>
+          <th class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Palletised freight, Hull to Leeds</td>
+          <td class="num">4</td>
+          <td class="num">250.00</td>
+          <td class="num">1,000.00</td>
+        </tr>
+        <tr>
+          <td>Tail-lift surcharge</td>
+          <td class="num">2</td>
+          <td class="num">100.00</td>
+          <td class="num">200.00</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2"></td>
+          <td class="num">Subtotal</td>
+          <td class="num">1,200.00</td>
+        </tr>
+        <tr>
+          <td colspan="2"></td>
+          <td class="num">Tax (8%)</td>
+          <td class="num">96.00</td>
+        </tr>
+        <tr class="total">
+          <td colspan="2"></td>
+          <td class="num">Total USD</td>
+          <td class="num">1,428.00</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <footer>
+      Payment by bank transfer within 30 days. Reference HF-3318 on all remittances.
+    </footer>
+  </body>
+</html>

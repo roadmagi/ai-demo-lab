@@ -257,18 +257,24 @@ Authored as HTML and printed to PDF headlessly — the same approach
 is established even though the output format differs. Keeping the HTML sources in
 the repo means the samples stay editable rather than becoming opaque binaries.
 
-## Open question for implementation
+## Resolved: the PDF library is `unpdf` 1.8.0
 
-**Which PDF library.** Requirements: pure JS (no native bindings, which Vercel's
-serverless runtime won't have), works under Next 16's bundler, exposes page count
-and text. Candidates are `unpdf` (1.8.0, explicitly targets serverless runtimes),
-`pdfjs-dist` (6.2.108), and `pdf-parse` (2.4.5).
+Verified on a deployed Vercel preview, which is the only environment that settles
+it — pure-JS extraction can pass locally and still fail on the serverless runtime,
+where a pdf.js worker or font asset that resolves at build time goes missing at
+invocation. A throwaway `POST /api/pdf-spike` route parsed a two-page invoice on
+`ai-demo-d3h660ems` and returned HTTP 200 with real extracted text:
 
-`unpdf` is the leading candidate on its runtime-compatibility claim, but that
-claim is **unverified against this stack**. Step one of implementation is a
-throwaway spike that parses a sample in a deployed Next 16 route — not locally,
-where native and bundler differences hide. If it fails there, fall back before
-any real code depends on it.
+```json
+{"ok":true,"pages":2,"chars":313,"head":"INVOICE INV-2026-0042\nKestrel Instruments Ltd\nBill To: Northwind Analytics\n..."}
+```
 
-This is deliberately the first task. Discovering it at the end would invalidate
-the route, the verification layer, and the tests together.
+Two pages and 313 characters from a genuine invocation, not a build artifact and
+not an SSO interstitial. `pdfjs-dist` (6.2.108) and `pdf-parse` (2.4.5) were never
+needed and are not installed. The spike route has been removed; `unpdf` stays in
+`package.json` as the extraction dependency.
+
+Note for anyone re-running this against a preview: previews sit behind Vercel SSO,
+so an unauthenticated request gets a `302` to `vercel.com/sso-api` rather than
+JSON. Send `x-vercel-protection-bypass`, and check the response *body* — a status
+code alone proves nothing here.
