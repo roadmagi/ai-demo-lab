@@ -20,6 +20,9 @@
 - **Rate limit bucket:** `"extract"`, 5 per visitor per hour.
 - **TDD:** write the failing test, run it, watch it fail, then implement. Every task commits.
 - **`npm test` and `npm run lint` must pass before any commit.**
+- **All work happens on the `demo-2-extract` branch.** Never push to `main`; it deploys to production.
+- **`lib/invoice.ts` stays free of server-only imports** (no `node:`, store, or Anthropic). The client imports `reconcile` from it, so one implementation of the arithmetic serves both sides.
+- **`vitest` is configured for `tests/**/*.test.ts` in a `node` environment.** There is no component-test infrastructure in this repo and no existing component tests; `.tsx` files are outside the test glob.
 
 ---
 
@@ -111,17 +114,26 @@ If this fails locally, stop and try `pdfjs-dist` (6.2.108), then `pdf-parse` (2.
 
 - [ ] **Step 4: Deploy and verify on Vercel — the step that actually matters**
 
+All work happens on the `demo-2-extract` branch. Vercel preview-deploys branches
+automatically, which exercises the same serverless runtime as production without
+putting a debug endpoint on the live site.
+
 ```bash
 git add -A && git commit -m "spike: probe PDF extraction on deployed runtime"
-git push origin main
+git push -u origin demo-2-extract
 ```
 
-Wait for the deployment, then hit the deployed URL:
+Get the preview URL from the push output or with `vercel ls`, then:
 
 ```bash
-curl -s -X POST https://ai-demo-lab-azure.vercel.app/api/pdf-spike \
+curl -s -X POST https://<preview-url>/api/pdf-spike \
   --data-binary @path/to/any.pdf -H "Content-Type: application/pdf"
 ```
+
+If the preview is protected by Vercel SSO, the response will be an HTML login
+page rather than JSON. **A 200 is not sufficient evidence here** — confirm the
+body is the expected JSON. If SSO blocks it, disable deployment protection for
+preview builds or use `vercel --prod=false` with a bypass token.
 
 Expected: the same `{"ok":true,...}` shape with `chars` > 0.
 
@@ -137,7 +149,7 @@ Replace the "Open question for implementation" section of `docs/superpowers/spec
 rm app/api/pdf-spike/route.ts
 git add -A
 git commit -m "Confirm PDF extraction works on Vercel, remove spike"
-git push origin main
+git push origin demo-2-extract
 ```
 
 The deployed check is the deliverable; the route itself is scaffolding.
@@ -667,6 +679,7 @@ git commit -m "Add invoice schema and arithmetic reconciliation"
   - `type VerifiedField = { path, label, value, quote, span, issues }`
   - `type VerifiedInvoice = { fields: VerifiedField[]; issues: ReconcileIssue[]; currency: string }`
   - `verifyInvoice(invoice: Invoice, text: string): VerifiedInvoice`
+  - `unflatten(fields: VerifiedField[], currency: string): Invoice`
 
 Flat over nested, deliberately: a flat `fields` array is what the table renders, what inline editing mutates, and what the CSV writes. Nesting would force all three to walk the same tree.
 
@@ -933,19 +946,151 @@ export function verifyInvoice(invoice: Invoice, text: string): VerifiedInvoice {
 }
 ```
 
-- [ ] **Step 8: Run and confirm green**
+- [ ] **Step 8: Write the failing test for `unflatten`**
+
+The client holds the flat `VerifiedField[]` but needs to re-run reconciliation
+after a correction. Rather than reimplementing the arithmetic client-side — two
+implementations that must agree is a bug waiting to happen — it rebuilds an
+`Invoice` and calls the same `reconcile`. `lib/invoice.ts` is pure TypeScript
+with no server-only imports, so the client can import it directly.
+
+Append to `tests/verify.test.ts`:
+
+```ts
+import { reconcile } from "@/lib/invoice";
+import { unflatten } from "@/lib/verify";
+
+describe("unflatten", () => {
+  it("round-trips through verifyInvoice unchanged", () => {
+    const original = sample();
+    const { fields, currency } = verifyInvoice(original, DOC);
+
+    expect(reconcile(unflatten(fields, currency))).toEqual(reconcile(original));
+  });
+
+  it("rebuilds line items in order", () => {
+    const two = sample({
+      lineItems: [
+        { description: q("First", "First"), quantity: q(1, "1"),
+          unitPrice: q(10, "10.00"), amount: q(10, "10.00") },
+        { description: q("Second", "Second"), quantity: q(2, "2"),
+          unitPrice: q(20, "20.00"), amount: q(40, "40.00") },
+      ],
+      subtotal: q(50, "Subtotal 50.00"),
+      tax: null,
+      total: q(50, "Total 50.00"),
+    });
+    const { fields, currency } = verifyInvoice(two, DOC);
+    const rebuilt = unflatten(fields, currency);
+
+    expect(rebuilt.lineItems).toHaveLength(2);
+    expect(rebuilt.lineItems[1].description.value).toBe("Second");
+  });
+
+  it("preserves an absent tax as null rather than zero", () => {
+    const { fields, currency } = verifyInvoice(sample({ tax: null }), DOC);
+
+    expect(unflatten(fields, currency).tax).toBeNull();
+  });
+
+  it("reflects a corrected value, so reconciliation clears", () => {
+    const wrong = sample({ total: q(9999, "Total 1296.00") });
+    const { fields, currency } = verifyInvoice(wrong, DOC);
+    expect(reconcile(unflatten(fields, currency))).not.toEqual([]);
+
+    // The correction a reviewer would type into the flagged input.
+    const corrected = fields.map((field) =>
+      field.path === "total" ? { ...field, value: 1296 } : field,
+    );
+
+    expect(reconcile(unflatten(corrected, currency))).toEqual([]);
+  });
+});
+```
+
+- [ ] **Step 9: Run it and watch it fail**
+
+```bash
+npm test -- tests/verify.test.ts
+```
+
+Expected: FAIL — `unflatten` is not exported.
+
+- [ ] **Step 10: Implement `unflatten`**
+
+Append to `lib/verify.ts`:
+
+```ts
+import type { Field, LineItem } from "./invoice";
+
+/**
+ * Rebuilds an `Invoice` from the flat field list.
+ *
+ * This exists so the client can re-run `reconcile` after a correction instead
+ * of carrying its own copy of the arithmetic. One implementation, one place to
+ * change, no invariant to document.
+ */
+export function unflatten(fields: VerifiedField[], currency: string): Invoice {
+  const at = (path: string) => fields.find((field) => field.path === path);
+
+  const asField = <T extends string | number>(path: string): Field<T> => {
+    const found = at(path);
+    // A missing required path means the field list was built by something
+    // other than verifyInvoice; failing loudly beats a silent zero.
+    if (!found) throw new Error(`unflatten: missing required field "${path}"`);
+    return { value: found.value as T, quote: found.quote };
+  };
+
+  const optional = <T extends string | number>(path: string): Field<T> | null => {
+    const found = at(path);
+    return found ? { value: found.value as T, quote: found.quote } : null;
+  };
+
+  const indices = [
+    ...new Set(
+      fields
+        .map((field) => /^lineItems\.(\d+)\./.exec(field.path)?.[1])
+        .filter((index): index is string => index !== undefined),
+    ),
+  ].sort((a, b) => Number(a) - Number(b));
+
+  const lineItems: LineItem[] = indices.map((index) => ({
+    description: asField<string>(`lineItems.${index}.description`),
+    quantity: asField<number>(`lineItems.${index}.quantity`),
+    unitPrice: asField<number>(`lineItems.${index}.unitPrice`),
+    amount: asField<number>(`lineItems.${index}.amount`),
+  }));
+
+  return {
+    vendor: asField<string>("vendor"),
+    invoiceNumber: asField<string>("invoiceNumber"),
+    issueDate: asField<string>("issueDate"),
+    dueDate: optional<string>("dueDate"),
+    currency: { value: currency, quote: at("currency")?.quote ?? currency },
+    lineItems,
+    subtotal: asField<number>("subtotal"),
+    tax: optional<number>("tax"),
+    total: asField<number>("total"),
+  };
+}
+```
+
+Note the `Invoice` and `Field` imports must be added to the existing import from
+`./invoice` at the top of the file.
+
+- [ ] **Step 11: Run and confirm green**
 
 ```bash
 npm test && npm run lint
 ```
 
-Expected: PASS, 11 tests in this file, whole suite green, lint clean.
+Expected: PASS, 15 tests in this file, whole suite green, lint clean.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
 git add lib/verify.ts tests/verify.test.ts
-git commit -m "Add quote verification and flattening to reviewable fields"
+git commit -m "Add quote verification, flattening, and unflatten for client reuse"
 ```
 
 ---
@@ -1142,13 +1287,10 @@ foreach ($name in @("clean", "bad-total", "inferred-field")) {
 }
 ```
 
-- [ ] **Step 5: Render and verify the PDFs parse**
+- [ ] **Step 5: Render the PDFs**
 
 ```bash
 cd assets && pwsh ./render-invoices.ps1 && cd ..
-node -e "
-const { extractPdf } = await import('./lib/pdf.ts');
-" 2>/dev/null || echo "verify via the test in step 6 instead"
 ```
 
 Confirm all three files exist and are non-trivial:
@@ -1630,9 +1772,13 @@ git commit -m "Add InvoicePane reusing demo 1's span highlighter"
 
 Corrections live in React state and never go back to the server. Editing a value re-runs reconciliation immediately, so fixing a bad subtotal visibly clears the downstream error — the single most convincing thing in the demo.
 
-- [ ] **Step 1: Write the client-side reconciliation helper**
+- [ ] **Step 1: Write the imports and the re-check helper**
 
-Reconciliation runs on the client too, over the flat field list, so a correction updates instantly without a round trip. It must agree with `lib/invoice.ts`: integer minor units, ±1 tolerance.
+Reconciliation re-runs on the client after a correction so the result is
+instant, but the arithmetic is **not** reimplemented here. `lib/invoice.ts` is
+pure TypeScript with no server-only imports, so the component rebuilds an
+`Invoice` with `unflatten` and calls the same `reconcile` the server used. One
+implementation, one place to change.
 
 ```tsx
 "use client";
@@ -1640,55 +1786,26 @@ Reconciliation runs on the client too, over the flat field list, so a correction
 import { useCallback, useMemo, useRef, useState } from "react";
 import { InvoicePane } from "@/components/InvoicePane";
 import type { ExtractEvent } from "@/lib/extract-protocol";
+import { reconcile } from "@/lib/invoice";
 import { createEventParser } from "@/lib/protocol";
-import type { VerifiedField, VerifiedInvoice } from "@/lib/verify";
-
-const minor = (value: number) => Math.round(Number(value) * 100);
-const agrees = (a: number, b: number) => Math.abs(a - b) <= 1;
+import { unflatten, type VerifiedField } from "@/lib/verify";
 
 /**
- * Re-checks the arithmetic over the current (possibly corrected) values.
- * Mirrors `reconcile` in lib/invoice.ts — same integer minor units, same ±1
- * tolerance — so a correction clears the flag the server raised.
+ * Paths currently failing reconciliation, recomputed from the live (possibly
+ * corrected) values via the same `reconcile` the server ran. Correcting a
+ * flagged value therefore clears its flag with no round trip and no second
+ * copy of the arithmetic.
  */
-function recheck(fields: VerifiedField[]): Set<string> {
-  const at = (path: string) => fields.find((field) => field.path === path);
-  const bad = new Set<string>();
-
-  const lineAmounts = fields.filter((f) => /^lineItems\.\d+\.amount$/.test(f.path));
-  for (const amount of lineAmounts) {
-    const index = amount.path.split(".")[1];
-    const quantity = at(`lineItems.${index}.quantity`);
-    const unitPrice = at(`lineItems.${index}.unitPrice`);
-    if (!quantity || !unitPrice) continue;
-    if (!agrees(minor(Number(quantity.value) * Number(unitPrice.value)), minor(Number(amount.value)))) {
-      bad.add(amount.path);
-      bad.add(quantity.path);
-      bad.add(unitPrice.path);
-    }
+function flaggedPaths(fields: VerifiedField[], currency: string): Set<string> {
+  try {
+    const issues = reconcile(unflatten(fields, currency));
+    return new Set(issues.flatMap((issue) => issue.paths));
+  } catch {
+    // `unflatten` throws if a required path is missing, which can only happen
+    // if the field list came from somewhere other than `verifyInvoice`. No
+    // reconciliation is better than a crash mid-review.
+    return new Set();
   }
-
-  const subtotal = at("subtotal");
-  if (subtotal && lineAmounts.length > 0) {
-    const summed = lineAmounts.reduce((total, f) => total + minor(Number(f.value)), 0);
-    if (!agrees(summed, minor(Number(subtotal.value)))) {
-      bad.add("subtotal");
-      for (const amount of lineAmounts) bad.add(amount.path);
-    }
-  }
-
-  const tax = at("tax");
-  const total = at("total");
-  if (subtotal && total) {
-    const expected = minor(Number(subtotal.value)) + minor(Number(tax?.value ?? 0));
-    if (!agrees(expected, minor(Number(total.value)))) {
-      bad.add("subtotal");
-      bad.add("total");
-      if (tax) bad.add("tax");
-    }
-  }
-
-  return bad;
 }
 ```
 
@@ -1732,13 +1849,17 @@ type Props = { samples: { name: string; label: string }[] };
 
 export function ExtractWorkbench({ samples }: Props) {
   const [fields, setFields] = useState<VerifiedField[] | null>(null);
+  const [currency, setCurrency] = useState("");
   const [text, setText] = useState("");
   const [stage, setStage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [activePath, setActivePath] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const flagged = useMemo(() => (fields ? recheck(fields) : new Set<string>()), [fields]);
+  const flagged = useMemo(
+    () => (fields ? flaggedPaths(fields, currency) : new Set<string>()),
+    [fields, currency],
+  );
 
   const run = useCallback(async (body: FormData) => {
     setNotice(null);
@@ -1766,6 +1887,7 @@ export function ExtractWorkbench({ samples }: Props) {
         if (event.type === "notice") { setNotice(event.message); setStage(null); }
         if (event.type === "result") {
           setFields(event.invoice.fields);
+          setCurrency(event.invoice.currency);
           setText(event.text);
           setStage(null);
         }
@@ -1991,10 +2113,10 @@ produce no text blocks for citations to attach to — legal and silently useless
 PDF citations are page-level regardless. Grounding comes from quote verification
 in `lib/verify.ts` instead.
 
-**Client and server reconciliation must agree.** `recheck` in
-`ExtractWorkbench.tsx` mirrors `reconcile` in `lib/invoice.ts` — integer minor
-units, ±1 tolerance. If one changes and the other doesn't, a correction appears
-to clear a flag the server would still raise.
+**`lib/invoice.ts` must stay free of server-only imports.** `ExtractWorkbench`
+imports `reconcile` directly so client and server share one implementation of
+the arithmetic. Adding a `node:` import, a store call, or anything Anthropic to
+that module breaks the client bundle and forces the duplication back.
 ```
 
 - [ ] **Step 6: Update `README.md`**
