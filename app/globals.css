@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/* Design tokens carried over from the Speed-to-Lead demo so every portfolio
+   piece reads as one body of work. Light-only, matching that project. */
+@theme {
+  --color-bg: #f6f7fb;
+  --color-card: #ffffff;
+  --color-ink: #0e1116;
+  --color-muted: #5b6573;
+  --color-line: #e6e8ec;
+  --color-brand: #3b5bff;
+  --color-brand-ink: #1c2bd6;
+  --color-brand-wash: #eef1ff;
+  --color-ok: #0f9d58;
+  --color-ok-wash: #eafaf0;
+  --color-warn: #b45309;
+  --color-warn-wash: #fef3c7;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+/* Citation highlight in the source pane. Animates so the eye catches the jump
+   when a citation is clicked. */
+@keyframes cite-flash {
+  0% {
+    background-color: color-mix(in srgb, var(--color-brand) 38%, transparent);
+  }
+  100% {
+    background-color: color-mix(in srgb, var(--color-brand) 14%, transparent);
+  }
+}
+
+.cite-span {
+  background-color: color-mix(in srgb, var(--color-brand) 14%, transparent);
+  border-radius: 2px;
+  padding: 1px 0;
+}
+
+.cite-span[data-active="true"] {
+  animation: cite-flash 900ms ease-out;
+  background-color: color-mix(in srgb, var(--color-brand) 22%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand) 45%, transparent);
+}

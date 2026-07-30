@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Support agent with real citations — wide thumbnail</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --brand:#3b5bff;
+    --brand-soft:#7b92ff;
+    --base:#0a0c12;
+    --ink:#ffffff;
+    --muted:#8b95a8;
+    --line:rgba(255,255,255,.09);
+    --edge:rgba(59,91,255,.28);
+    --warn:#ffb454;
+  }
+  html,body{width:1280px;height:720px;overflow:hidden}
+  body{
+    background:var(--base);
+    color:var(--ink);
+    font-family:"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:geometricPrecision;
+  }
+
+  .card{position:relative;width:1280px;height:720px;padding:52px 56px;display:flex;flex-direction:column;overflow:hidden}
+
+  .glow{position:absolute;inset:0;pointer-events:none}
+  .glow::before{
+    content:"";position:absolute;left:-200px;top:-300px;width:1000px;height:1000px;
+    background:radial-gradient(circle at center,rgba(59,91,255,.32),rgba(59,91,255,.09) 42%,transparent 68%);
+  }
+  .glow::after{
+    content:"";position:absolute;right:-260px;bottom:-360px;width:860px;height:860px;
+    background:radial-gradient(circle at center,rgba(123,146,255,.12),transparent 65%);
+  }
+  .dots{
+    position:absolute;inset:0;pointer-events:none;opacity:.45;
+    background-image:radial-gradient(rgba(255,255,255,.10) 1px,transparent 1px);
+    background-size:24px 24px;
+    mask-image:linear-gradient(180deg,rgba(0,0,0,.9),transparent 68%);
+    -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.9),transparent 68%);
+  }
+  .topline{
+    position:absolute;left:0;right:0;top:0;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(123,146,255,.55) 22%,rgba(123,146,255,.55) 78%,transparent);
+  }
+  .card > *{position:relative;z-index:1}
+
+  header{display:flex;align-items:center;justify-content:space-between}
+  .brand{display:flex;align-items:center;gap:13px}
+  .mark{
+    width:32px;height:32px;border-radius:9px;
+    background:linear-gradient(135deg,var(--brand),#9db0ff);
+    box-shadow:0 0 0 1px rgba(255,255,255,.14),0 8px 20px rgba(59,91,255,.45);
+    display:grid;place-items:center;
+  }
+  .mark svg{width:17px;height:17px;display:block}
+  .wordmark{font-size:17px;font-weight:600;letter-spacing:.19em;text-transform:uppercase;color:#e7eaf2}
+  .pill{
+    display:flex;align-items:center;gap:8px;
+    padding:7px 15px 7px 12px;border-radius:999px;
+    border:1px solid var(--edge);background:rgba(59,91,255,.11);
+    font-size:13px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#b9c6ff;
+  }
+  .led{width:8px;height:8px;border-radius:50%;background:#39d98a;box-shadow:0 0 0 3px rgba(57,217,138,.20)}
+
+  /* two columns: the pitch on the left, the proof on the right */
+  .body{display:flex;gap:48px;margin-top:34px;flex:1;min-height:0}
+  .left{width:520px;flex:none;display:flex;flex-direction:column}
+  .right{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+
+  h1{
+    font-size:62px;line-height:1.04;font-weight:700;letter-spacing:-.035em;
+    background:linear-gradient(180deg,#ffffff,#dae1f1);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .sub{
+    margin-top:20px;font-size:22px;line-height:1.48;color:var(--muted);letter-spacing:-.01em;
+  }
+  .sub b{color:#dbe2f2;font-weight:600}
+
+  .points{margin-top:26px;display:flex;flex-direction:column;gap:11px}
+  .point{display:flex;align-items:flex-start;gap:12px;font-size:16px;line-height:1.4;color:#a4aebf}
+  .point svg{width:17px;height:17px;flex:none;margin-top:2px;color:var(--brand-soft)}
+  .point b{color:#dbe2f2;font-weight:600}
+
+  .metrics{margin-top:auto;padding-top:26px;border-top:1px solid var(--line);display:flex;gap:26px}
+  .metric{flex:1}
+  .metric .val{font-size:31px;font-weight:700;letter-spacing:-.03em;color:#fff;line-height:1}
+  .metric .val em{font-style:normal;color:var(--brand-soft)}
+  .metric .val.warn em{color:var(--warn)}
+  .metric .lab{margin-top:8px;font-size:14px;line-height:1.35;color:var(--muted)}
+
+  .cap{font-size:13px;font-weight:600;letter-spacing:.17em;text-transform:uppercase;color:#68738a}
+
+  .answer{
+    margin-top:14px;padding:18px 22px;border-radius:14px;
+    background:linear-gradient(90deg,rgba(23,28,40,.92),rgba(17,20,29,.72));
+    border:1px solid var(--line);border-left:3px solid var(--brand);
+    box-shadow:0 14px 30px rgba(0,0,0,.34);
+    font-size:19px;line-height:1.5;color:#c9d1e2;letter-spacing:-.01em;
+  }
+  .answer b{color:#fff;font-weight:600}
+  .fn{
+    display:inline-block;vertical-align:super;margin-left:4px;
+    min-width:19px;padding:1px 6px;border-radius:5px;
+    background:var(--brand);color:#fff;
+    font-size:12px;font-weight:700;line-height:1.2;text-align:center;
+  }
+
+  .link{
+    display:flex;align-items:center;gap:10px;margin:11px 0 0 26px;
+    font-size:14px;color:#6f7a90;letter-spacing:.02em;
+  }
+  .link svg{width:16px;height:16px;color:var(--brand-soft);flex:none}
+
+  .source{
+    margin-top:11px;padding:17px 22px;border-radius:14px;
+    background:rgba(13,16,23,.85);border:1px solid var(--line);
+    font-size:17px;line-height:1.55;color:#7c8699;letter-spacing:-.005em;
+  }
+  .source mark{
+    background:linear-gradient(180deg,rgba(59,91,255,.34),rgba(59,91,255,.22));
+    border-bottom:2px solid rgba(123,146,255,.75);
+    border-radius:3px;padding:2px 4px;color:#eef1fa;
+    -webkit-box-decoration-break:clone;box-decoration-break:clone;
+  }
+  .source .file{
+    display:block;margin-bottom:8px;
+    font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#5b6478;
+  }
+
+  footer{margin-top:26px;display:flex;align-items:center;justify-content:space-between}
+  .stack{font-size:15px;color:#6d7789;letter-spacing:.015em}
+  .stack i{font-style:normal;color:#9aa5b9}
+  .badge{font-size:14px;color:#6d7789;letter-spacing:.06em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="glow"></div>
+  <div class="dots"></div>
+  <div class="topline"></div>
+
+  <header>
+    <div class="brand">
+      <span class="mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 5.5h11M4 10h16M4 14.5h9"/><circle cx="18.5" cy="15.5" r="3.6"/><path d="M21.2 18.2 23 20"/>
+        </svg>
+      </span>
+      <span class="wordmark">AI Demo Lab</span>
+    </div>
+    <div class="pill"><span class="led"></span>Live demo</div>
+  </header>
+
+  <div class="body">
+    <div class="left">
+      <h1>Support AI that<br>cites its sources</h1>
+      <p class="sub">Every claim links to the <b>exact sentence</b> it came from &mdash; and it says <b>&ldquo;I don&rsquo;t know&rdquo;</b> instead of guessing.</p>
+
+      <div class="points">
+        <div class="point">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          <span>Refusals become a ranked <b>content-gap backlog</b></span>
+        </div>
+        <div class="point">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          <span>Hands off to a human instead of dead-ending</span>
+        </div>
+        <div class="point">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          <span>Cache, rate limit and <b>daily token budget</b> in front of the model</span>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="val">1<em>&nbsp;click</em></div>
+          <div class="lab">to verify any claim against its source</div>
+        </div>
+        <div class="metric">
+          <div class="val warn">0<em>&nbsp;guesses</em></div>
+          <div class="lab">refuses when the docs don&rsquo;t cover it</div>
+        </div>
+        <div class="metric">
+          <div class="val">~10<em>&times;</em></div>
+          <div class="lab">cheaper repeats via prompt cache</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="cap">Click a footnote &rarr; the source highlights</div>
+
+      <div class="answer">
+        A cancelled workspace stays readable for <b>90 days</b><span class="fn">1</span>, and exports keep working the whole time<span class="fn">2</span>.
+      </div>
+
+      <div class="link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 4v14M6 12.5 12 19l6-6.5"/>
+        </svg>
+        character offsets returned by the API &mdash; not references the model wrote
+      </div>
+
+      <div class="source">
+        <span class="file">billing-and-plans.md</span>
+        Cancellation takes effect at the end of the billing period. <mark>Read-only workspaces are kept for 90 days.</mark> After that the workspace and all of its data are permanently deleted.
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="stack"><i>Claude</i> &middot; <i>Next.js</i> &middot; <i>TypeScript</i> &middot; <i>Vercel</i> &middot; <i>Redis</i></div>
+    <div class="badge">Source available</div>
+  </footer>
+</div>
+</body>
+</html>
