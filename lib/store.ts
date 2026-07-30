@@ -211,24 +211,54 @@ function reportStoreFailure(error: unknown) {
 const STORE_KEY = Symbol.for("ai-demo-lab.store");
 type GlobalWithStore = typeof globalThis & { [STORE_KEY]?: Store };
 
+/**
+ * Reads a credential the way a `.env` file would.
+ *
+ * A dashboard stores whatever was pasted into it, quotes included, and
+ * `"https://…"` is not a URL — it starts with a quote. The error that follows
+ * names a string that looks perfectly correct in the UI, which is a miserable
+ * thing to debug, so unwrap one layer of quotes and trim.
+ */
+function credential(name: string): string | undefined {
+  const raw = process.env[name]?.trim();
+  if (!raw) return undefined;
+  const unwrapped = raw.replace(/^(['"])([\s\S]*)\1$/, "$2").trim();
+  return unwrapped || undefined;
+}
+
+/**
+ * Resolves the store from the environment. Exported so the resolution can be
+ * tested without reaching through the `globalThis` cache below.
+ */
+export function createStore(): Store {
+  const url = credential("UPSTASH_REDIS_REST_URL");
+  const token = credential("UPSTASH_REDIS_REST_TOKEN");
+  if (!url || !token) return new MemoryStore();
+
+  try {
+    return new ResilientStore(new RedisStore(new Redis({ url, token })));
+  } catch (error) {
+    // The client validates its URL in the constructor, so a malformed one
+    // throws here rather than on first use — before ResilientStore exists to
+    // catch anything. Without this the whole site 500s on a typo.
+    reportStoreFailure(error);
+    return new MemoryStore();
+  }
+}
+
 /** Redis when it's configured, process memory otherwise. */
 export function getStore(): Store {
   const container = globalThis as GlobalWithStore;
   if (container[STORE_KEY]) return container[STORE_KEY];
 
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-
-  container[STORE_KEY] =
-    url && token
-      ? new ResilientStore(new RedisStore(new Redis({ url, token })))
-      : new MemoryStore();
+  container[STORE_KEY] = createStore();
 
   return container[STORE_KEY];
 }
 
 export function isPersistent(): boolean {
   return Boolean(
-    process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN,
+    credential("UPSTASH_REDIS_REST_URL") &&
+      credential("UPSTASH_REDIS_REST_TOKEN"),
   );
 }
