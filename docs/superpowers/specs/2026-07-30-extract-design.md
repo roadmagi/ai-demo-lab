@@ -272,3 +272,29 @@ any real code depends on it.
 
 This is deliberately the first task. Discovering it at the end would invalidate
 the route, the verification layer, and the tests together.
+
+### Spike status — STILL OPEN, blocked on Vercel SSO
+
+`unpdf` 1.8.0 is installed and passes everything that can be checked without a
+readable preview deployment:
+
+- Plain Node: 2 pages, 313 chars extracted from a generated 2-page invoice.
+- `npm run dev` + `POST /api/pdf-spike`: `{"ok":true,"pages":2,"chars":313,...}`.
+- `npm run build`: compiles clean, `/api/pdf-spike` emitted as a dynamic route.
+- Vercel preview `ai-demo-khqgtrdnv` built to **Ready** — so it bundles on
+  Vercel's builder without a native-binding or resolution failure.
+
+**The deployed-runtime check has NOT been done.** Every preview URL returns
+`302 -> vercel.com/sso-api`; the project has `ssoProtection` set to
+`all_except_custom_domains` and no automation bypass secret. A Ready build is
+not proof of runtime success — a missing pdf.js worker file fails at invocation,
+not at build, and that is precisely the failure this spike exists to catch.
+
+So `unpdf` remains **provisional**, and `pdfjs-dist` (6.2.108) / `pdf-parse`
+(2.4.5) remain live fallbacks. `app/api/pdf-spike/route.ts` is deliberately left
+in the tree so this closes with one request once a preview is reachable — either
+by enabling Protection Bypass for Automation (then sending
+`x-vercel-protection-bypass`) or by setting preview protection to none.
+
+Do not build Task 2 on `unpdf` until this section says it was verified against a
+deployed invocation with a real page and character count.
